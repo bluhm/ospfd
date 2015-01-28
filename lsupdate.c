@@ -1,4 +1,4 @@
-/*	$OpenBSD: lsupdate.c,v 1.43 2015/01/22 22:09:39 tedu Exp $ */
+/*	$OpenBSD: lsupdate.c,v 1.44 2015/01/28 22:03:17 bluhm Exp $ */
 
 /*
  * Copyright (c) 2005 Claudio Jeker <claudio@openbsd.org>
