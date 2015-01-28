@@ -329,9 +329,12 @@ ls_retrans_list_del(struct nbr *nbr, struct lsa_hdr *lsa_hdr)
 
 	if ((le = ls_retrans_list_get(nbr, lsa_hdr)) == NULL)
 		return (-1);
-	/* le->le_ref->hdr.age is 0 or MAX_AGE. This check avoids acknowledging
-	 * ls updates with age MAX_AGE by ls acks of former ls updates with a
-	 * lower age */
+	/*
+	 * Compare LSA with the ack by comparing not only the seq_num and
+	 * checksum but also the age field.  Since we only care about MAX_AGE
+	 * vs. non-MAX_AGE LSA, a simple >= comparison is good enough.  This
+	 * ensures that LSA withdraws are not acked by a previous update.
+	 */
 	if (lsa_hdr->seq_num == le->le_ref->hdr.seq_num &&
 	    lsa_hdr->ls_chksum == le->le_ref->hdr.ls_chksum &&
 	    ntohs(lsa_hdr->age) >= ntohs(le->le_ref->hdr.age)) {
