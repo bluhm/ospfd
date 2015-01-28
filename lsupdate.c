@@ -330,7 +330,7 @@ ls_retrans_list_del(struct nbr *nbr, struct lsa_hdr *lsa_hdr)
 	if ((le = ls_retrans_list_get(nbr, lsa_hdr)) == NULL)
 		return (-1);
 	/*
-	 * Compare LSA with the ack by comparing not only the seq_num and
+	 * Compare LSA with the Ack by comparing not only the seq_num and
 	 * checksum but also the age field.  Since we only care about MAX_AGE
 	 * vs. non-MAX_AGE LSA, a simple >= comparison is good enough.  This
 	 * ensures that LSA withdraws are not acked by a previous update.
