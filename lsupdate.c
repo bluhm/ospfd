@@ -329,8 +329,12 @@ ls_retrans_list_del(struct nbr *nbr, struct lsa_hdr *lsa_hdr)
 
 	if ((le = ls_retrans_list_get(nbr, lsa_hdr)) == NULL)
 		return (-1);
+       /* le->le_ref->hdr.age is 0 or MAX_AGE. This check avoids acknowledging
+        * ls updates with age MAX_AGE by ls acks of former ls updates with a
+        * lower age */
 	if (lsa_hdr->seq_num == le->le_ref->hdr.seq_num &&
-	    lsa_hdr->ls_chksum == le->le_ref->hdr.ls_chksum) {
+           lsa_hdr->ls_chksum == le->le_ref->hdr.ls_chksum &&
+           ntohs(lsa_hdr->age) >= ntohs(le->le_ref->hdr.age)) {
 		ls_retrans_list_free(nbr, le);
 		return (0);
 	}
