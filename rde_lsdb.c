@@ -30,8 +30,9 @@
 struct vertex	*vertex_get(struct lsa *, struct rde_nbr *, struct lsa_tree *);
 
 int		 lsa_router_check(struct lsa *, u_int16_t);
+int		 lsa_exist(struct iface *, u_int8_t, u_int32_t, u_int32_t);
 struct vertex	*lsa_find_tree(struct lsa_tree *, u_int16_t, u_int32_t,
-		    u_int32_t);
+		    u_int32_t, int);
 void		 lsa_timeout(int, short, void *);
 void		 lsa_refresh(struct vertex *);
 int		 lsa_equal(struct lsa *, struct lsa *);
@@ -272,8 +273,8 @@ lsa_check(struct rde_nbr *nbr, struct lsa *lsa, u_int16_t len)
 	}
 
 	/* MaxAge handling */
-	if (lsa->hdr.age == htons(MAX_AGE) && !nbr->self && lsa_find(nbr->iface,
-	    lsa->hdr.type, lsa->hdr.ls_id, lsa->hdr.adv_rtr) == NULL &&
+	if (lsa->hdr.age == htons(MAX_AGE) && !nbr->self && lsa_exist(
+	    nbr->iface, lsa->hdr.type, lsa->hdr.ls_id, lsa->hdr.adv_rtr) &&
 	    !rde_nbr_loading(area)) {
 		/*
 		 * if no neighbor in state Exchange or Loading
@@ -489,8 +490,9 @@ lsa_age(struct vertex *v)
 	v->lsa->hdr.age = htons(age);
 }
 
-struct vertex *
-lsa_find(struct iface *iface, u_int8_t type, u_int32_t ls_id, u_int32_t adv_rtr)
+int
+lsa_exist(struct iface *iface, u_int8_t type, u_int32_t ls_id,
+    u_int32_t adv_rtr)
 {
 	struct lsa_tree	*tree;
 
@@ -502,19 +504,36 @@ lsa_find(struct iface *iface, u_int8_t type, u_int32_t ls_id, u_int32_t adv_rtr)
 	else
 		tree = &iface->area->lsa_tree;
 
-	return lsa_find_tree(tree, type, ls_id, adv_rtr);
+	return lsa_find_tree(tree, type, ls_id, adv_rtr, 1) ? 1 : 0;
+}
+
+struct vertex *
+lsa_find(struct iface *iface, u_int8_t type, u_int32_t ls_id,
+    u_int32_t adv_rtr)
+{
+	struct lsa_tree	*tree;
+
+	if (type == LSA_TYPE_EXTERNAL ||
+	    type == LSA_TYPE_AS_OPAQ)
+		tree = &asext_tree;
+	else if (type == LSA_TYPE_LINK_OPAQ)
+		tree = &iface->lsa_tree;
+	else
+		tree = &iface->area->lsa_tree;
+
+	return lsa_find_tree(tree, type, ls_id, adv_rtr, 0);
 }
 
 struct vertex *
 lsa_find_area(struct area *area, u_int8_t type, u_int32_t ls_id,
     u_int32_t adv_rtr)
 {
-	return lsa_find_tree(&area->lsa_tree, type, ls_id, adv_rtr);
+	return lsa_find_tree(&area->lsa_tree, type, ls_id, adv_rtr, 0);
 }
 
 struct vertex *
 lsa_find_tree(struct lsa_tree *tree, u_int16_t type, u_int32_t ls_id,
-    u_int32_t adv_rtr)
+    u_int32_t adv_rtr, int find_deleted)
 {
 	struct vertex	 key;
 	struct vertex	*v;
@@ -525,10 +544,11 @@ lsa_find_tree(struct lsa_tree *tree, u_int16_t type, u_int32_t ls_id,
 
 	v = RB_FIND(lsa_tree, tree, &key);
 
-	/* LSA that are deleted are not findable */
+	/* LSA that are deleted are not findable unless explicitly requested */
+	if (find_deleted)
+		return (v);
 	if (v && v->deleted)
 		return (NULL);
-
 	if (v)
 		lsa_age(v);
 
