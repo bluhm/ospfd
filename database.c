@@ -167,7 +167,7 @@ recv_db_description(struct nbr *nbr, char *buf, u_int16_t len)
 	int			 dupe = 0;
 
 	if (len < sizeof(dd_hdr)) {
-		log_warnx("recv_db_description: neighbor ID %s: ",
+		log_warnx("recv_db_description: neighbor ID %s: "
 		    "bad packet size", inet_ntoa(nbr->id));
 		return;
 	}
