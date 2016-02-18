@@ -1,4 +1,4 @@
-/*	$OpenBSD: database.c,v 1.32 2015/03/13 02:31:29 claudio Exp $ */
+/*	$OpenBSD: database.c,v 1.33 2016/02/18 15:33:24 bluhm Exp $ */
 
 /*
  * Copyright (c) 2005 Claudio Jeker <claudio@openbsd.org>
