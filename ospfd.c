@@ -1,4 +1,4 @@
-/*	$OpenBSD: ospfd.c,v 1.83 2015/02/10 05:24:48 claudio Exp $ */
+/*	$OpenBSD: ospfd.c,v 1.89 2016/02/02 17:51:11 sthen Exp $ */
 
 /*
  * Copyright (c) 2005 Claudio Jeker <claudio@openbsd.org>
@@ -192,13 +192,12 @@ main(int argc, char *argv[])
 		opts |= OSPFD_OPT_STUB_ROUTER;
 	}
 
-
 	/* fetch interfaces early */
 	kif_init();
 
 	/* parse config file */
 	if ((ospfd_conf = parse_config(conffile, opts)) == NULL) {
-		kr_shutdown();
+		kif_clear();
 		exit(1);
 	}
 	ospfd_conf->csock = sockname;
@@ -208,7 +207,7 @@ main(int argc, char *argv[])
 			print_config(ospfd_conf);
 		else
 			fprintf(stderr, "configuration OK\n");
-		kr_shutdown();
+		kif_clear();
 		exit(0);
 	}
 
@@ -243,9 +242,6 @@ main(int argc, char *argv[])
 	    pipe_parent2ospfe);
 	ospfe_pid = ospfe(ospfd_conf, pipe_parent2ospfe, pipe_ospfe2rde,
 	    pipe_parent2rde);
-
-	/* show who we are */
-	setproctitle("parent");
 
 	event_init();
 
@@ -373,7 +369,7 @@ main_dispatch_ospfe(int fd, short event, void *bula)
 	ibuf = &iev->ibuf;
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1)
+		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
 			fatal("imsg_read error");
 		if (n == 0)	/* connection closed */
 			shut = 1;
@@ -460,7 +456,7 @@ main_dispatch_rde(int fd, short event, void *bula)
 	ibuf = &iev->ibuf;
 
 	if (event & EV_READ) {
-		if ((n = imsg_read(ibuf)) == -1)
+		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
 			fatal("imsg_read error");
 		if (n == 0)	/* connection closed */
 			shut = 1;
@@ -511,13 +507,15 @@ main_dispatch_rde(int fd, short event, void *bula)
 void
 main_imsg_compose_ospfe(int type, pid_t pid, void *data, u_int16_t datalen)
 {
-	imsg_compose_event(iev_ospfe, type, 0, pid, -1, data, datalen);
+	if (iev_ospfe)
+		imsg_compose_event(iev_ospfe, type, 0, pid, -1, data, datalen);
 }
 
 void
 main_imsg_compose_rde(int type, pid_t pid, void *data, u_int16_t datalen)
 {
-	imsg_compose_event(iev_rde, type, 0, pid, -1, data, datalen);
+	if (iev_rde)
+		imsg_compose_event(iev_rde, type, 0, pid, -1, data, datalen);
 }
 
 void
@@ -821,6 +819,8 @@ merge_interfaces(struct area *a, struct area *xa)
 			    i->name);
 			if (ospfd_process == PROC_OSPF_ENGINE)
 				if_fsm(i, IF_EVT_DOWN);
+			else if (ospfd_process == PROC_RDE_ENGINE)
+				rde_nbr_iface_del(i);
 			LIST_REMOVE(i, entry);
 			if_del(i);
 		}
@@ -858,7 +858,7 @@ merge_interfaces(struct area *a, struct area *xa)
 			i->self->priority = i->priority;
 		i->flags = xi->flags; /* needed? */
 		i->type = xi->type; /* needed? */
-		i->media_type = xi->media_type; /* needed? */
+		i->if_type = xi->if_type; /* needed? */
 		i->linkstate = xi->linkstate; /* needed? */
 
 		i->auth_type = xi->auth_type;
